@@ -5,12 +5,36 @@ import pickle
 import os
 import scipy.io
 import scipy.misc
+import glob
+import cv2
+from numpy import array
+from PIL import Image
+
+
+def img_read(image_dir):
+    cv_img = []
+    for img in glob.glob(image_dir):
+        n = cv2.imread(img)
+        cv_img.append(n)
+
+    return cv_img
+
+
+def resize_images(images, size=[32, 32, 3]):
+    # convert float type to integer
+    resized_image_arrays = np.zeros([len(images)] + size)
+    for i, image in enumerate(images):
+        resized_image = cv2.resize(image, (32,32), interpolation = cv2.INTER_AREA)
+        print type(resized_image)
+        resized_image_arrays[i] = resized_image
+
+    return resized_image_arrays
 
 
 class Solver(object):
 
     def __init__(self, model, batch_size=100, pretrain_iter=20000, train_iter=2000, sample_iter=100, 
-                 svhn_dir='svhn', mnist_dir='mnist', log_dir='logs', sample_save_path='sample', 
+                 svhn_dir='/home/manthan/Desktop/Classical', mnist_dir='/home/manthan/Desktop/Metal', log_dir='logs', sample_save_path='sample',
                  model_save_path='model', pretrained_model='model/svhn_model-20000', test_model='model/dtn-1800'):
         
         self.model = model
@@ -30,7 +54,7 @@ class Solver(object):
 
     def load_svhn(self, image_dir, split='train'):
         print ('loading svhn image dataset..')
-        
+        '''
         if self.model.mode == 'pretrain':
             image_file = 'extra_32x32.mat' if split=='train' else 'test_32x32.mat'
         else:
@@ -41,19 +65,39 @@ class Solver(object):
         images = np.transpose(svhn['X'], [3, 0, 1, 2]) / 127.5 - 1
         labels = svhn['y'].reshape(-1)
         labels[np.where(labels==10)] = 0
+        '''
+        image_file = '/*.jpg'
+        image_dir = image_dir + image_file
+        images = img_read(image_dir)
+        images = resize_images(images)
+        print images.shape
+        images = images / 127.5 - 1
         print ('finished loading svhn image dataset..!')
-        return images, labels
+        return images
+        # return images, labels
 
     def load_mnist(self, image_dir, split='train'):
         print ('loading mnist image dataset..')
+        '''
         image_file = 'train.pkl' if split=='train' else 'test.pkl'
         image_dir = os.path.join(image_dir, image_file)
         with open(image_dir, 'rb') as f:
             mnist = pickle.load(f)
         images = mnist['X'] / 127.5 - 1
         labels = mnist['y']
+        '''
+        image_file = '/*.jpg'
+        image_dir = image_dir + image_file
+        images = img_read(image_dir)
+
+        images = np.asarray(images)
+        images = resize_images(images)
+
+        images = images / 127.5 - 1
+
         print ('finished loading mnist image dataset..!')
-        return images, labels
+        return images
+        # return images, labels
 
     def merge_images(self, sources, targets, k=10):
         _, h, w, _ = sources.shape
@@ -104,8 +148,8 @@ class Solver(object):
 
     def train(self):
         # load svhn dataset
-        svhn_images, _ = self.load_svhn(self.svhn_dir, split='train')
-        mnist_images, _ = self.load_mnist(self.mnist_dir, split='train')
+        svhn_images = self.load_svhn(self.svhn_dir, split='train')
+        mnist_images = self.load_mnist(self.mnist_dir, split='train')
 
         # build a graph
         model = self.model

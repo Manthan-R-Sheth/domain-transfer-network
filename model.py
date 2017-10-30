@@ -131,14 +131,14 @@ class DTN(object):
                 self.f_train_op_src = slim.learning.create_train_op(self.f_loss_src, self.f_optimizer_src, variables_to_train=f_vars)
             
             # summary op
-            d_loss_src_summary = tf.summary.scalar('src_d_loss', self.d_loss_src)
-            g_loss_src_summary = tf.summary.scalar('src_g_loss', self.g_loss_src)
-            f_loss_src_summary = tf.summary.scalar('src_f_loss', self.f_loss_src)
-            origin_images_summary = tf.summary.image('src_origin_images', self.src_images)
-            sampled_images_summary = tf.summary.image('src_sampled_images', self.fake_images)
-            self.summary_op_src = tf.summary.merge([d_loss_src_summary, g_loss_src_summary, 
-                                                    f_loss_src_summary, origin_images_summary, 
-                                                    sampled_images_summary])
+            # d_loss_src_summary = tf.summary.scalar('src_d_loss', self.d_loss_src)
+            # g_loss_src_summary = tf.summary.scalar('src_g_loss', self.g_loss_src)
+            # f_loss_src_summary = tf.summary.scalar('src_f_loss', self.f_loss_src)
+            # origin_images_summary = tf.summary.image('src_origin_images', self.src_images)
+            # sampled_images_summary = tf.summary.image('src_sampled_images', self.fake_images)
+            # self.summary_op_src = tf.summary.merge([d_loss_src_summary, g_loss_src_summary,
+            #                                        f_loss_src_summary, origin_images_summary,
+            #                                        sampled_images_summary])
             
             # target domain (mnist)
             self.fx = self.content_extractor(self.trg_images, reuse=True)
@@ -164,18 +164,17 @@ class DTN(object):
                 self.g_train_op_trg = slim.learning.create_train_op(self.g_loss_trg, self.g_optimizer_trg, variables_to_train=g_vars)
             
             # summary op
-            d_loss_fake_trg_summary = tf.summary.scalar('trg_d_loss_fake', self.d_loss_fake_trg)
-            d_loss_real_trg_summary = tf.summary.scalar('trg_d_loss_real', self.d_loss_real_trg)
-            d_loss_trg_summary = tf.summary.scalar('trg_d_loss', self.d_loss_trg)
-            g_loss_fake_trg_summary = tf.summary.scalar('trg_g_loss_fake', self.g_loss_fake_trg)
-            g_loss_const_trg_summary = tf.summary.scalar('trg_g_loss_const', self.g_loss_const_trg)
-            g_loss_trg_summary = tf.summary.scalar('trg_g_loss', self.g_loss_trg)
-            origin_images_summary = tf.summary.image('trg_origin_images', self.trg_images)
-            sampled_images_summary = tf.summary.image('trg_reconstructed_images', self.reconst_images)
-            self.summary_op_trg = tf.summary.merge([d_loss_trg_summary, g_loss_trg_summary, 
-                                                    d_loss_fake_trg_summary, d_loss_real_trg_summary,
-                                                    g_loss_fake_trg_summary, g_loss_const_trg_summary,
-                                                    origin_images_summary, sampled_images_summary])
-            for var in tf.trainable_variables():
-                tf.summary.histogram(var.op.name, var)
-            
+            # d_loss_fake_trg_summary = tf.summary.scalar('trg_d_loss_fake', self.d_loss_fake_trg)
+            # d_loss_real_trg_summary = tf.summary.scalar('trg_d_loss_real', self.d_loss_real_trg)
+            # d_loss_trg_summary = tf.summary.scalar('trg_d_loss', self.d_loss_trg)
+            # g_loss_fake_trg_summary = tf.summary.scalar('trg_g_loss_fake', self.g_loss_fake_trg)
+            # g_loss_const_trg_summary = tf.summary.scalar('trg_g_loss_const', self.g_loss_const_trg)
+            # g_loss_trg_summary = tf.summary.scalar('trg_g_loss', self.g_loss_trg)
+            # origin_images_summary = tf.summary.image('trg_origin_images', self.trg_images)
+            # sampled_images_summary = tf.summary.image('trg_reconstructed_images', self.reconst_images)
+            # self.summary_op_trg = tf.summary.merge([d_loss_trg_summary, g_loss_trg_summary,
+            #                                        d_loss_fake_trg_summary, d_loss_real_trg_summary,
+            #                                        g_loss_fake_trg_summary, g_loss_const_trg_summary,
+            #                                        origin_images_summary, sampled_images_summary])
+            # for var in tf.trainable_variables():
+            #    tf.summary.histogram(var.op.name, var)

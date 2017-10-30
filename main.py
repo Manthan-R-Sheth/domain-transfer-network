@@ -11,8 +11,8 @@ FLAGS = flags.FLAGS
 def main(_):
     
     model = DTN(mode=FLAGS.mode, learning_rate=0.0003)
-    solver = Solver(model, batch_size=100, pretrain_iter=20000, train_iter=2000, sample_iter=100, 
-                    svhn_dir='svhn', mnist_dir='mnist', model_save_path=FLAGS.model_save_path, sample_save_path=FLAGS.sample_save_path)
+    solver = Solver(model, batch_size=2, pretrain_iter=20000, train_iter=2000, sample_iter=100,
+                    svhn_dir='/home/manthan/Desktop/Classical2', mnist_dir='/home/manthan/Desktop/Metal2', model_save_path=FLAGS.model_save_path, sample_save_path=FLAGS.sample_save_path)
     
     # create directories if not exist
     if not tf.gfile.Exists(FLAGS.model_save_path):
