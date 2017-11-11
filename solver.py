@@ -5,13 +5,45 @@ import pickle
 import os
 import scipy.io
 import scipy.misc
+import glob
+import cv2
+from numpy import array
+from PIL import Image
+
+
+def img_read(image_dir):
+    cv_img = []
+    for img in glob.glob(image_dir):
+        n = cv2.imread(img)
+        cv_img.append(n)
+
+    return cv_img
+
+def img_read_partial(image_dir, i, bt_size):
+    cv_img = []
+    for img in glob.glob(image_dir+'/*.jpg')[i*bt_size:(i+1)*bt_size]:
+        n = cv2.imread(img)
+        cv_img.append(n)
+
+    return cv_img
+
+
+def resize_images(images, size=[32, 32, 3]):
+    # convert float type to integer
+    resized_image_arrays = np.zeros([len(images)] + size)
+    for i, image in enumerate(images):
+        resized_image = cv2.resize(image, (32,32), interpolation = cv2.INTER_AREA)
+        # print type(resized_image)
+        resized_image_arrays[i] = resized_image
+
+    return resized_image_arrays
 
 
 class Solver(object):
 
     def __init__(self, model, batch_size=100, pretrain_iter=20000, train_iter=2000, sample_iter=100, 
-                 svhn_dir='svhn', mnist_dir='mnist', log_dir='logs', sample_save_path='sample', 
-                 model_save_path='model', pretrained_model='model/svhn_model-20000', test_model='model/dtn-1800'):
+                 svhn_dir='classical1', mnist_dir='metal1', log_dir='logs', sample_save_path='sample',
+                 model_save_path='model', pretrained_model='model/svhn_model-20000', test_model='model/dtn-1000'):
         
         self.model = model
         self.batch_size = batch_size
@@ -30,7 +62,7 @@ class Solver(object):
 
     def load_svhn(self, image_dir, split='train'):
         print ('loading svhn image dataset..')
-        
+        '''
         if self.model.mode == 'pretrain':
             image_file = 'extra_32x32.mat' if split=='train' else 'test_32x32.mat'
         else:
@@ -41,28 +73,50 @@ class Solver(object):
         images = np.transpose(svhn['X'], [3, 0, 1, 2]) / 127.5 - 1
         labels = svhn['y'].reshape(-1)
         labels[np.where(labels==10)] = 0
+        '''
+        image_file = '/*.jpg'
+        image_dir = image_dir + image_file
+        images = img_read(image_dir)
+        images = resize_images(images)
+        # print images.shape
+        images = images / 127.5 - 1
         print ('finished loading svhn image dataset..!')
-        return images, labels
+        # print (images[0])
+        return images
+        # return images, labels
 
     def load_mnist(self, image_dir, split='train'):
         print ('loading mnist image dataset..')
+        '''
         image_file = 'train.pkl' if split=='train' else 'test.pkl'
         image_dir = os.path.join(image_dir, image_file)
         with open(image_dir, 'rb') as f:
             mnist = pickle.load(f)
         images = mnist['X'] / 127.5 - 1
         labels = mnist['y']
+        '''
+        image_file = '/*.jpg'
+        image_dir = image_dir + image_file
+        images = img_read(image_dir)
+
+        images = np.asarray(images)
+        images = resize_images(images)
+
+        images = images / 127.5 - 1
+
         print ('finished loading mnist image dataset..!')
-        return images, labels
+        return images
+        # return images, labels
 
     def merge_images(self, sources, targets, k=10):
         _, h, w, _ = sources.shape
-        row = int(np.sqrt(self.batch_size))
+        row = int(np.sqrt(self.batch_size))+1
         merged = np.zeros([row*h, row*w*2, 3])
 
         for idx, (s, t) in enumerate(zip(sources, targets)):
             i = idx // row
             j = idx % row
+            
             merged[i*h:(i+1)*h, (j*2)*h:(j*2+1)*h, :] = s
             merged[i*h:(i+1)*h, (j*2+1)*h:(j*2+2)*h, :] = t
         return merged
@@ -77,7 +131,7 @@ class Solver(object):
         model.build_model()
         
         with tf.Session(config=self.config) as sess:
-            tf.global_variables_initializer().run()
+            tf.initialize_all_variables().run()
             saver = tf.train.Saver()
             summary_writer = tf.summary.FileWriter(logdir=self.log_dir, graph=tf.get_default_graph())
 
@@ -104,8 +158,9 @@ class Solver(object):
 
     def train(self):
         # load svhn dataset
-        svhn_images, _ = self.load_svhn(self.svhn_dir, split='train')
-        mnist_images, _ = self.load_mnist(self.mnist_dir, split='train')
+        svhn_images = self.load_svhn(self.svhn_dir, split='train')
+        mnist_images = self.load_mnist(self.mnist_dir, split='train')
+        # print svhn_images.shape[0], mnist_images.shape[0]
 
         # build a graph
         model = self.model
@@ -118,14 +173,17 @@ class Solver(object):
 
         with tf.Session(config=self.config) as sess:
             # initialize G and D
-            tf.global_variables_initializer().run()
+            tf.initialize_all_variables().run()
             # restore variables of F
+            '''
             print ('loading pretrained model F..')
             variables_to_restore = slim.get_model_variables(scope='content_extractor')
             restorer = tf.train.Saver(variables_to_restore)
             restorer.restore(sess, self.pretrained_model)
             summary_writer = tf.summary.FileWriter(logdir=self.log_dir, graph=tf.get_default_graph())
+            '''
             saver = tf.train.Saver()
+            
 
             print ('start training..!')
             f_interval = 15
@@ -134,6 +192,11 @@ class Solver(object):
                 i = step % int(svhn_images.shape[0] / self.batch_size)
                 # train the model for source domain S
                 src_images = svhn_images[i*self.batch_size:(i+1)*self.batch_size]
+                # i = step % int(10245 / self.batch_size)
+                # src_images = img_read_partial(self.svhn_dir, i, self.batch_size)
+                # src_images = resize_images(src_images)
+                # src_images = src_images / 127.5 - 1
+                
                 feed_dict = {model.src_images: src_images}
                 
                 sess.run(model.d_train_op_src, feed_dict) 
@@ -151,15 +214,22 @@ class Solver(object):
                     sess.run(model.f_train_op_src, feed_dict)
                 
                 if (step+1) % 10 == 0:
+                    print ('source - step : ', step+1)
+                    '''
                     summary, dl, gl, fl = sess.run([model.summary_op_src, \
                         model.d_loss_src, model.g_loss_src, model.f_loss_src], feed_dict)
                     summary_writer.add_summary(summary, step)
                     print ('[Source] step: [%d/%d] d_loss: [%.6f] g_loss: [%.6f] f_loss: [%.6f]' \
                                %(step+1, self.train_iter, dl, gl, fl))
+                    '''
                 
                 # train the model for target domain T
                 j = step % int(mnist_images.shape[0] / self.batch_size)
                 trg_images = mnist_images[j*self.batch_size:(j+1)*self.batch_size]
+                # j = step % int(1748 / self.batch_size)
+                # trg_images = img_read_partial(self.mnist_dir, j, self.batch_size)
+                # trg_images = resize_images(trg_images)
+                # trg_images = trg_images / 127.5 - 1
                 feed_dict = {model.src_images: src_images, model.trg_images: trg_images}
                 sess.run(model.d_train_op_trg, feed_dict)
                 sess.run(model.d_train_op_trg, feed_dict)
@@ -169,11 +239,14 @@ class Solver(object):
                 sess.run(model.g_train_op_trg, feed_dict)
 
                 if (step+1) % 10 == 0:
+                    print ('target - step : ', step+1)
+                    '''
                     summary, dl, gl = sess.run([model.summary_op_trg, \
                         model.d_loss_trg, model.g_loss_trg], feed_dict)
                     summary_writer.add_summary(summary, step)
                     print ('[Target] step: [%d/%d] d_loss: [%.6f] g_loss: [%.6f]' \
                                %(step+1, self.train_iter, dl, gl))
+                    '''
 
                 if (step+1) % 200 == 0:
                     saver.save(sess, os.path.join(self.model_save_path, 'dtn'), global_step=step+1)
@@ -185,7 +258,8 @@ class Solver(object):
         model.build_model()
 
         # load svhn dataset
-        svhn_images, _ = self.load_svhn(self.svhn_dir)
+        svhn_images = self.load_svhn(self.svhn_dir)
+        # print (svhn_images[0][0].shape)
 
         with tf.Session(config=self.config) as sess:
             # load trained parameters
@@ -199,9 +273,15 @@ class Solver(object):
                 batch_images = svhn_images[i*self.batch_size:(i+1)*self.batch_size]
                 feed_dict = {model.images: batch_images}
                 sampled_batch_images = sess.run(model.sampled_images, feed_dict)
+                # print (sampled_batch_images.shape)
 
                 # merge and save source images and sampled target images
                 merged = self.merge_images(batch_images, sampled_batch_images)
                 path = os.path.join(self.sample_save_path, 'sample-%d-to-%d.png' %(i*self.batch_size, (i+1)*self.batch_size))
-                scipy.misc.imsave(path, merged)
+                sampled_batch_images = (sampled_batch_images + 1)*127.5
+                merged = (merged+1)*127.5
+                # print (batch_images[0])
+                # scipy.misc.imsave(path, merged)
+                # print (sampled_batch_images.shape)
+                cv2.imwrite(path, sampled_batch_images[0])
                 print ('saved %s' %path)
