@@ -44,6 +44,7 @@ class Solver(object):
     def __init__(self, model, batch_size=100, pretrain_iter=20000, train_iter=2000, sample_iter=100, 
                  classical_dir='classical1', metal_rock_dir='metal1', log_dir='logs', sample_save_path='sample',
                  model_save_path='model', pretrained_model='model/classical_model-20000', test_model='model/dtn-1000'):
+
         
         self.model = model
         self.batch_size = batch_size
@@ -62,6 +63,7 @@ class Solver(object):
 
     def load_classical(self, image_dir, split='train'):
         print ('loading classical image dataset..')
+
         '''
         if self.model.mode == 'pretrain':
             image_file = 'extra_32x32.mat' if split=='train' else 'test_32x32.mat'
@@ -81,12 +83,14 @@ class Solver(object):
         # print images.shape
         images = images / 127.5 - 1
         print ('finished loading classical image dataset..!')
+
         # print (images[0])
         return images
         # return images, labels
 
     def load_metal_rock(self, image_dir, split='train'):
         print ('loading metal_rock image dataset..')
+
         '''
         image_file = 'train.pkl' if split=='train' else 'test.pkl'
         image_dir = os.path.join(image_dir, image_file)
@@ -94,6 +98,7 @@ class Solver(object):
             metal_rock = pickle.load(f)
         images = metal_rock['X'] / 127.5 - 1
         labels = metal_rock['y']
+
         '''
         image_file = '/*.jpg'
         image_dir = image_dir + image_file
@@ -194,6 +199,7 @@ class Solver(object):
                 src_images = classical_images[i*self.batch_size:(i+1)*self.batch_size]
                 # i = step % int(10245 / self.batch_size)
                 # src_images = img_read_partial(self.classical_dir, i, self.batch_size)
+
                 # src_images = resize_images(src_images)
                 # src_images = src_images / 127.5 - 1
                 
@@ -228,6 +234,7 @@ class Solver(object):
                 trg_images = metal_rock_images[j*self.batch_size:(j+1)*self.batch_size]
                 # j = step % int(1748 / self.batch_size)
                 # trg_images = img_read_partial(self.metal_rock_dir, j, self.batch_size)
+
                 # trg_images = resize_images(trg_images)
                 # trg_images = trg_images / 127.5 - 1
                 feed_dict = {model.src_images: src_images, model.trg_images: trg_images}
@@ -261,6 +268,7 @@ class Solver(object):
         classical_images = self.load_classical(self.classical_dir)
         # print (classical_images[0][0].shape)
 
+
         with tf.Session(config=self.config) as sess:
             # load trained parameters
             print ('loading test model..')
@@ -285,3 +293,4 @@ class Solver(object):
                 # print (sampled_batch_images.shape)
                 cv2.imwrite(path, sampled_batch_images[0])
                 print ('saved %s' %path)
+

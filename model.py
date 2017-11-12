@@ -110,12 +110,14 @@ class DTN(object):
         elif self.mode == 'train':
             self.src_images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'classical_images')
             self.trg_images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'metal_rock_images')
+
             
             # source domain (classical to metal_rock)
             self.fx, residual = self.content_extractor(self.src_images)
             self.fake_images = self.generator(self.fx, residual)
             self.logits = self.discriminator(self.fake_images)
             self.fgfx, _ = self.content_extractor(self.fake_images, reuse=True)
+
             # tf.reset_default_graph()
             # print self.fx.get_shape, self.fgfx.get_shape
 
