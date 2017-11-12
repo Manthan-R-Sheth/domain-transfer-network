@@ -59,6 +59,7 @@ public class MIDIPlayer {
     	if(ImageAndMusicTools.isValidImageFile(file)) {
     		pngmusic.loadImage(file);
     		currSequence = pngmusic.imageToMidi();
+    		System.out.println(currSequence);
     	} else if(ImageAndMusicTools.isValidMidiFile(file)) {
             currSequence = MidiSystem.getSequence(file);
     	}
@@ -142,7 +143,7 @@ public class MIDIPlayer {
     public void play() throws Exception {
         if(currSequence == null)
             throw new InvalidMidiDataException("no song is loaded =(");
-
+        System.out.println("here");
         sequencer.open();
         sequencer.setSequence(currSequence);
         sequencer.start();

@@ -3,8 +3,12 @@ package controller;
 import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.ArrayList;
 
+import javax.imageio.ImageIO;
+import javax.sound.midi.InvalidMidiDataException;
 import javax.swing.JOptionPane;
 
 import player.MIDIPlayer;
@@ -53,6 +57,58 @@ public class MIDIPlayerController {
         addBackListener();
         addForwardListener();
         addInstrumentListener();
+
+        // used for converting midi files (input) to midi images(input to DTN) as a pre processing step.
+
+//        ArrayList<File> concat = new ArrayList<File>();
+//        concatFiles("/home/manthan/AI/MIDI-Image-Converter/Metal",concat);
+//        convertMidiToImges(concat);
+    }
+
+    private void concatFiles(String directoryName, ArrayList<File> files) {
+        File directory = new File(directoryName);
+
+        // get all the files from a directory
+        File[] fList = directory.listFiles();
+        for (File file : fList) {
+            if (file.isFile()) {
+                files.add(file);
+            } else if (file.isDirectory()) {
+                concatFiles(file.getAbsolutePath(), files);
+            }
+        }
+    }
+
+    private void convertMidiToImges(ArrayList<File> files) {
+        try {
+            int i=0;
+            //files = new ArrayList<File>();
+            //files.add(new File("/home/manthan/AI/MIDI-Image-Converter/Classical/Classical Archives - The Greats (MIDI)/Classical Piano Midis/Varios - Título desconocido/a_h/bouree32.mid"));
+            System.out.println(files.size());
+            for(File file : files) {
+                try {
+                    i++;
+                    System.out.println(file.getAbsolutePath());
+                    System.out.println(i);
+                    if (!file.getAbsolutePath().toLowerCase().contains(".mid"))
+                        continue;
+                    model.open(new File(file.getAbsolutePath()));
+                    model.stop();
+                    Image image = model.convertSequenceToPNG();
+                    if (image != null)
+                        ImageIO.write((BufferedImage) image, "jpg", new File("/home/manthan/AI/MIDI-Image-Converter/Output/Metal/" + i + ".jpg"));
+
+                }
+                catch (Exception imde)
+                {
+                    continue;
+                }
+            }
+        }
+        catch(Exception exception) {
+            view.setStatusFieldText("Failed to open file");
+            view.displayMessageBox(exception.toString(), JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     /**

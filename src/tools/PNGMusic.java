@@ -221,8 +221,12 @@ public class PNGMusic {
         int[] rgb = new int[numtracks];
         Track[] allTracks = sequence.getTracks();
         Track[] kLongest = getKLongestTracks(allTracks, numtracks);
-        
+
         Dimension imageSize = generateDimension(sequence);
+        if(imageSize.height == 0 || imageSize.width == 0)
+        {
+            return null;
+        }
         BufferedImage newImage = new BufferedImage(imageSize.width, imageSize.height, BufferedImage.TYPE_3BYTE_BGR);
         
         System.err.println("INFO: Image size = " + imageSize.width + "x" + imageSize.height + " px");
