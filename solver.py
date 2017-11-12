@@ -42,16 +42,17 @@ def resize_images(images, size=[32, 32, 3]):
 class Solver(object):
 
     def __init__(self, model, batch_size=100, pretrain_iter=20000, train_iter=2000, sample_iter=100, 
-                 svhn_dir='classical1', mnist_dir='metal1', log_dir='logs', sample_save_path='sample',
-                 model_save_path='model', pretrained_model='model/svhn_model-20000', test_model='model/dtn-1000'):
+                 classical_dir='classical1', metal_rock_dir='metal1', log_dir='logs', sample_save_path='sample',
+                 model_save_path='model', pretrained_model='model/classical_model-20000', test_model='model/dtn-1000'):
+
         
         self.model = model
         self.batch_size = batch_size
         self.pretrain_iter = pretrain_iter
         self.train_iter = train_iter
         self.sample_iter = sample_iter
-        self.svhn_dir = svhn_dir
-        self.mnist_dir = mnist_dir
+        self.classical_dir = classical_dir
+        self.metal_rock_dir = metal_rock_dir
         self.log_dir = log_dir
         self.sample_save_path = sample_save_path
         self.model_save_path = model_save_path
@@ -60,8 +61,9 @@ class Solver(object):
         self.config = tf.ConfigProto()
         self.config.gpu_options.allow_growth=True
 
-    def load_svhn(self, image_dir, split='train'):
-        print ('loading svhn image dataset..')
+    def load_classical(self, image_dir, split='train'):
+        print ('loading classical image dataset..')
+
         '''
         if self.model.mode == 'pretrain':
             image_file = 'extra_32x32.mat' if split=='train' else 'test_32x32.mat'
@@ -69,9 +71,9 @@ class Solver(object):
             image_file = 'train_32x32.mat' if split=='train' else 'test_32x32.mat'
             
         image_dir = os.path.join(image_dir, image_file)
-        svhn = scipy.io.loadmat(image_dir)
-        images = np.transpose(svhn['X'], [3, 0, 1, 2]) / 127.5 - 1
-        labels = svhn['y'].reshape(-1)
+        classical = scipy.io.loadmat(image_dir)
+        images = np.transpose(classical['X'], [3, 0, 1, 2]) / 127.5 - 1
+        labels = classical['y'].reshape(-1)
         labels[np.where(labels==10)] = 0
         '''
         image_file = '/*.jpg'
@@ -80,20 +82,23 @@ class Solver(object):
         images = resize_images(images)
         # print images.shape
         images = images / 127.5 - 1
-        print ('finished loading svhn image dataset..!')
+        print ('finished loading classical image dataset..!')
+
         # print (images[0])
         return images
         # return images, labels
 
-    def load_mnist(self, image_dir, split='train'):
-        print ('loading mnist image dataset..')
+    def load_metal_rock(self, image_dir, split='train'):
+        print ('loading metal_rock image dataset..')
+
         '''
         image_file = 'train.pkl' if split=='train' else 'test.pkl'
         image_dir = os.path.join(image_dir, image_file)
         with open(image_dir, 'rb') as f:
-            mnist = pickle.load(f)
-        images = mnist['X'] / 127.5 - 1
-        labels = mnist['y']
+            metal_rock = pickle.load(f)
+        images = metal_rock['X'] / 127.5 - 1
+        labels = metal_rock['y']
+
         '''
         image_file = '/*.jpg'
         image_dir = image_dir + image_file
@@ -104,7 +109,7 @@ class Solver(object):
 
         images = images / 127.5 - 1
 
-        print ('finished loading mnist image dataset..!')
+        print ('finished loading metal_rock image dataset..!')
         return images
         # return images, labels
 
@@ -122,9 +127,9 @@ class Solver(object):
         return merged
 
     def pretrain(self):
-        # load svhn dataset
-        train_images, train_labels = self.load_svhn(self.svhn_dir, split='train')
-        test_images, test_labels = self.load_svhn(self.svhn_dir, split='test')
+        # load classical dataset
+        train_images, train_labels = self.load_classical(self.classical_dir, split='train')
+        test_images, test_labels = self.load_classical(self.classical_dir, split='test')
 
         # build a graph
         model = self.model
@@ -153,14 +158,14 @@ class Solver(object):
                                %(step+1, self.pretrain_iter, l, acc, test_acc))
 
                 if (step+1) % 1000 == 0:  
-                    saver.save(sess, os.path.join(self.model_save_path, 'svhn_model'), global_step=step+1) 
-                    print ('svhn_model-%d saved..!' %(step+1))
+                    saver.save(sess, os.path.join(self.model_save_path, 'classical_model'), global_step=step+1) 
+                    print ('classical_model-%d saved..!' %(step+1))
 
     def train(self):
-        # load svhn dataset
-        svhn_images = self.load_svhn(self.svhn_dir, split='train')
-        mnist_images = self.load_mnist(self.mnist_dir, split='train')
-        # print svhn_images.shape[0], mnist_images.shape[0]
+        # load classical dataset
+        classical_images = self.load_classical(self.classical_dir, split='train')
+        metal_rock_images = self.load_metal_rock(self.metal_rock_dir, split='train')
+        # print classical_images.shape[0], metal_rock_images.shape[0]
 
         # build a graph
         model = self.model
@@ -189,11 +194,12 @@ class Solver(object):
             f_interval = 15
             for step in range(self.train_iter+1):
                 
-                i = step % int(svhn_images.shape[0] / self.batch_size)
+                i = step % int(classical_images.shape[0] / self.batch_size)
                 # train the model for source domain S
-                src_images = svhn_images[i*self.batch_size:(i+1)*self.batch_size]
+                src_images = classical_images[i*self.batch_size:(i+1)*self.batch_size]
                 # i = step % int(10245 / self.batch_size)
-                # src_images = img_read_partial(self.svhn_dir, i, self.batch_size)
+                # src_images = img_read_partial(self.classical_dir, i, self.batch_size)
+
                 # src_images = resize_images(src_images)
                 # src_images = src_images / 127.5 - 1
                 
@@ -224,10 +230,11 @@ class Solver(object):
                     '''
                 
                 # train the model for target domain T
-                j = step % int(mnist_images.shape[0] / self.batch_size)
-                trg_images = mnist_images[j*self.batch_size:(j+1)*self.batch_size]
+                j = step % int(metal_rock_images.shape[0] / self.batch_size)
+                trg_images = metal_rock_images[j*self.batch_size:(j+1)*self.batch_size]
                 # j = step % int(1748 / self.batch_size)
-                # trg_images = img_read_partial(self.mnist_dir, j, self.batch_size)
+                # trg_images = img_read_partial(self.metal_rock_dir, j, self.batch_size)
+
                 # trg_images = resize_images(trg_images)
                 # trg_images = trg_images / 127.5 - 1
                 feed_dict = {model.src_images: src_images, model.trg_images: trg_images}
@@ -257,9 +264,10 @@ class Solver(object):
         model = self.model
         model.build_model()
 
-        # load svhn dataset
-        svhn_images = self.load_svhn(self.svhn_dir)
-        # print (svhn_images[0][0].shape)
+        # load classical dataset
+        classical_images = self.load_classical(self.classical_dir)
+        # print (classical_images[0][0].shape)
+
 
         with tf.Session(config=self.config) as sess:
             # load trained parameters
@@ -270,7 +278,7 @@ class Solver(object):
             print ('start sampling..!')
             for i in range(self.sample_iter):
                 # train model for source domain S
-                batch_images = svhn_images[i*self.batch_size:(i+1)*self.batch_size]
+                batch_images = classical_images[i*self.batch_size:(i+1)*self.batch_size]
                 feed_dict = {model.images: batch_images}
                 sampled_batch_images = sess.run(model.sampled_images, feed_dict)
                 # print (sampled_batch_images.shape)
@@ -285,3 +293,4 @@ class Solver(object):
                 # print (sampled_batch_images.shape)
                 cv2.imwrite(path, sampled_batch_images[0])
                 print ('saved %s' %path)
+
