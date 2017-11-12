@@ -13,7 +13,7 @@ class DTN(object):
         # images: (batch, 32, 32, 3) or (batch, 32, 32, 1)
         
         if images.get_shape()[3] == 1:
-            # For mnist dataset, replicate the gray scale image 3 times.
+            # For metal_rock dataset, replicate the gray scale image 3 times.
             images = tf.image.grayscale_to_rgb(images)
         
         with tf.variable_scope('content_extractor', reuse=reuse):
@@ -22,21 +22,26 @@ class DTN(object):
                 with slim.arg_scope([slim.batch_norm], decay=0.95, center=True, scale=True, 
                                     activation_fn=tf.nn.relu, is_training=(self.mode=='train' or self.mode=='pretrain')):
                     
+                    residual = []
                     net = slim.conv2d(images, 64, [3, 3], scope='conv1')   # (batch_size, 16, 16, 64)
+                    residual.append(net)
                     net = slim.batch_norm(net, scope='bn1')
                     net = slim.conv2d(net, 128, [3, 3], scope='conv2')     # (batch_size, 8, 8, 128)
+                    residual.append(net)
                     net = slim.batch_norm(net, scope='bn2')
                     net = slim.conv2d(net, 256, [3, 3], scope='conv3')     # (batch_size, 4, 4, 256)
+                    residual.append(net)
                     net = slim.batch_norm(net, scope='bn3')
                     net = slim.conv2d(net, 128, [4, 4], padding='VALID', scope='conv4')   # (batch_size, 1, 1, 128)
                     net = slim.batch_norm(net, activation_fn=tf.nn.tanh, scope='bn4')
                     if self.mode == 'pretrain':
                         net = slim.conv2d(net, 10, [1, 1], padding='VALID', scope='out')
                         net = slim.flatten(net)
-                    return net
+                    
+                    return net, residual
                 
-    def generator(self, inputs, reuse=False):
-        # inputs: (batch, 1, 1, 128)
+    def generator(self, inputs, residual, reuse=False):
+        # inputs: (batch, 1, 1, 128), residual
         with tf.variable_scope('generator', reuse=reuse):
             with slim.arg_scope([slim.conv2d_transpose], padding='SAME', activation_fn=None,           
                                  stride=2, weights_initializer=tf.contrib.layers.xavier_initializer()):
@@ -44,12 +49,15 @@ class DTN(object):
                                      activation_fn=tf.nn.relu, is_training=(self.mode=='train')):
 
                     net = slim.conv2d_transpose(inputs, 512, [4, 4], padding='VALID', scope='conv_transpose1')   # (batch_size, 4, 4, 512)
+                    net = tf.concat(3, [net, residual[-1]])
                     net = slim.batch_norm(net, scope='bn1')
                     net = slim.conv2d_transpose(net, 256, [3, 3], scope='conv_transpose2')  # (batch_size, 8, 8, 256)
+                    net = tf.concat(3, [net, residual[-2]])
                     net = slim.batch_norm(net, scope='bn2')
                     net = slim.conv2d_transpose(net, 128, [3, 3], scope='conv_transpose3')  # (batch_size, 16, 16, 128)
+                    net = tf.concat(3, [net, residual[-3]])
                     net = slim.batch_norm(net, scope='bn3')
-                    net = slim.conv2d_transpose(net, 1, [3, 3], activation_fn=tf.nn.tanh, scope='conv_transpose4')   # (batch_size, 32, 32, 1)
+                    net = slim.conv2d_transpose(net, 3, [3, 3], activation_fn=tf.nn.tanh, scope='conv_transpose4')   # (batch_size, 32, 32, 3)
                     return net
     
     def discriminator(self, images, reuse=False):
@@ -73,11 +81,11 @@ class DTN(object):
     def build_model(self):
         
         if self.mode == 'pretrain':
-            self.images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'svhn_images')
-            self.labels = tf.placeholder(tf.int64, [None], 'svhn_labels')
+            self.images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'classical_images')
+            self.labels = tf.placeholder(tf.int64, [None], 'classical_labels')
             
             # logits and accuracy
-            self.logits = self.content_extractor(self.images)
+            self.logits, _ = self.content_extractor(self.images)
             self.pred = tf.argmax(self.logits, 1)
             self.correct_pred = tf.equal(self.pred, self.labels)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_pred, tf.float32))
@@ -93,21 +101,23 @@ class DTN(object):
             self.summary_op = tf.summary.merge([loss_summary, accuracy_summary])
 
         elif self.mode == 'eval':
-            self.images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'svhn_images')
+            self.images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'classical_images')
 
-            # source domain (svhn to mnist)
-            self.fx = self.content_extractor(self.images)
-            self.sampled_images = self.generator(self.fx)
+            # source domain (classical to metal_rock)
+            self.fx, residual = self.content_extractor(self.images)
+            self.sampled_images = self.generator(self.fx, residual)
 
         elif self.mode == 'train':
-            self.src_images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'svhn_images')
-            self.trg_images = tf.placeholder(tf.float32, [None, 32, 32, 1], 'mnist_images')
+            self.src_images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'classical_images')
+            self.trg_images = tf.placeholder(tf.float32, [None, 32, 32, 3], 'metal_rock_images')
             
-            # source domain (svhn to mnist)
-            self.fx = self.content_extractor(self.src_images)
-            self.fake_images = self.generator(self.fx)
+            # source domain (classical to metal_rock)
+            self.fx, residual = self.content_extractor(self.src_images)
+            self.fake_images = self.generator(self.fx, residual)
             self.logits = self.discriminator(self.fake_images)
-            self.fgfx = self.content_extractor(self.fake_images, reuse=True)
+            self.fgfx, _ = self.content_extractor(self.fake_images, reuse=True)
+            # tf.reset_default_graph()
+            # print self.fx.get_shape, self.fgfx.get_shape
 
             # loss
             self.d_loss_src = slim.losses.sigmoid_cross_entropy(self.logits, tf.zeros_like(self.logits))
@@ -131,20 +141,24 @@ class DTN(object):
                 self.f_train_op_src = slim.learning.create_train_op(self.f_loss_src, self.f_optimizer_src, variables_to_train=f_vars)
             
             # summary op
-            d_loss_src_summary = tf.summary.scalar('src_d_loss', self.d_loss_src)
-            g_loss_src_summary = tf.summary.scalar('src_g_loss', self.g_loss_src)
-            f_loss_src_summary = tf.summary.scalar('src_f_loss', self.f_loss_src)
-            origin_images_summary = tf.summary.image('src_origin_images', self.src_images)
-            sampled_images_summary = tf.summary.image('src_sampled_images', self.fake_images)
-            self.summary_op_src = tf.summary.merge([d_loss_src_summary, g_loss_src_summary, 
-                                                    f_loss_src_summary, origin_images_summary, 
-                                                    sampled_images_summary])
+            # d_loss_src_summary = tf.summary.scalar('src_d_loss', self.d_loss_src)
+            # g_loss_src_summary = tf.summary.scalar('src_g_loss', self.g_loss_src)
+            # f_loss_src_summary = tf.summary.scalar('src_f_loss', self.f_loss_src)
+            # origin_images_summary = tf.summary.image('src_origin_images', self.src_images)
+            # sampled_images_summary = tf.summary.image('src_sampled_images', self.fake_images)
+            # self.summary_op_src = tf.summary.merge([d_loss_src_summary, g_loss_src_summary, 
+            #                                        f_loss_src_summary, origin_images_summary, 
+            #                                        sampled_images_summary])
             
-            # target domain (mnist)
-            self.fx = self.content_extractor(self.trg_images, reuse=True)
-            self.reconst_images = self.generator(self.fx, reuse=True)
+            # target domain (metal_rock)
+            self.fx, residual = self.content_extractor(self.trg_images, reuse=True)
+            # tf.reset_default_graph()
+            self.reconst_images = self.generator(self.fx, residual, reuse=True)
+            # tf.reset_default_graph()
             self.logits_fake = self.discriminator(self.reconst_images, reuse=True)
+            # tf.reset_default_graph()
             self.logits_real = self.discriminator(self.trg_images, reuse=True)
+            # tf.reset_default_graph()
             
             # loss
             self.d_loss_fake_trg = slim.losses.sigmoid_cross_entropy(self.logits_fake, tf.zeros_like(self.logits_fake))
@@ -164,18 +178,18 @@ class DTN(object):
                 self.g_train_op_trg = slim.learning.create_train_op(self.g_loss_trg, self.g_optimizer_trg, variables_to_train=g_vars)
             
             # summary op
-            d_loss_fake_trg_summary = tf.summary.scalar('trg_d_loss_fake', self.d_loss_fake_trg)
-            d_loss_real_trg_summary = tf.summary.scalar('trg_d_loss_real', self.d_loss_real_trg)
-            d_loss_trg_summary = tf.summary.scalar('trg_d_loss', self.d_loss_trg)
-            g_loss_fake_trg_summary = tf.summary.scalar('trg_g_loss_fake', self.g_loss_fake_trg)
-            g_loss_const_trg_summary = tf.summary.scalar('trg_g_loss_const', self.g_loss_const_trg)
-            g_loss_trg_summary = tf.summary.scalar('trg_g_loss', self.g_loss_trg)
-            origin_images_summary = tf.summary.image('trg_origin_images', self.trg_images)
-            sampled_images_summary = tf.summary.image('trg_reconstructed_images', self.reconst_images)
-            self.summary_op_trg = tf.summary.merge([d_loss_trg_summary, g_loss_trg_summary, 
-                                                    d_loss_fake_trg_summary, d_loss_real_trg_summary,
-                                                    g_loss_fake_trg_summary, g_loss_const_trg_summary,
-                                                    origin_images_summary, sampled_images_summary])
-            for var in tf.trainable_variables():
-                tf.summary.histogram(var.op.name, var)
+            # d_loss_fake_trg_summary = tf.summary.scalar('trg_d_loss_fake', self.d_loss_fake_trg)
+            # d_loss_real_trg_summary = tf.summary.scalar('trg_d_loss_real', self.d_loss_real_trg)
+            # d_loss_trg_summary = tf.summary.scalar('trg_d_loss', self.d_loss_trg)
+            # g_loss_fake_trg_summary = tf.summary.scalar('trg_g_loss_fake', self.g_loss_fake_trg)
+            # g_loss_const_trg_summary = tf.summary.scalar('trg_g_loss_const', self.g_loss_const_trg)
+            # g_loss_trg_summary = tf.summary.scalar('trg_g_loss', self.g_loss_trg)
+            # origin_images_summary = tf.summary.image('trg_origin_images', self.trg_images)
+            # sampled_images_summary = tf.summary.image('trg_reconstructed_images', self.reconst_images)
+            # self.summary_op_trg = tf.summary.merge([d_loss_trg_summary, g_loss_trg_summary, 
+            #                                         d_loss_fake_trg_summary, d_loss_real_trg_summary,
+            #                                         g_loss_fake_trg_summary, g_loss_const_trg_summary,
+            #                                        origin_images_summary, sampled_images_summary])
+            # for var in tf.trainable_variables():
+            #     tf.summary.histogram(var.op.name, var)
             
