@@ -1,5 +1,5 @@
 # Domain Transfer Network (DTN) 
-TensorFlow implementation of [Unsupervised Cross-Domain Image Generation.](https://arxiv.org/abs/1611.02200)
+TensorFlow implementation of [Unsupervised Cross-Domain Image Generation.](https://arxiv.org/abs/1611.02200) for supervised learning
 ![alt text](jpg/dtn.jpg)
 
 ## Requirements
